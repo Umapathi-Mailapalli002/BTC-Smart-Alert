@@ -48,8 +48,10 @@ useEffect(() => {
       const res1 = await axios.get(
         "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=14"
       );
+
       const candles = res1.data; // Each candle = [time, open, high, low, close, ...]
 
+      
       // 2. Fetch current BTC/USDT price
       const priceRes = await axios.get(
         "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
@@ -73,7 +75,7 @@ useEffect(() => {
       const open = Math.round(parseFloat(candles[candles.length - 1][1]) * usdToInr); // yesterday's open
 
       // 5. Calculate 7-day average (last 7 closes)
-      const last7 = closePrices.slice(-7);
+      const last7 = closePrices.slice(-30);
       const sevenDayAvg =
         (last7.reduce((sum, val) => sum + val, 0) / last7.length) * usdToInr;
 
