@@ -55,19 +55,21 @@ useEffect(() => {
         "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
       );
       const currentUSD = parseFloat(priceRes.data.price);
-      setBtcPrice(currentUSD);
-      // 3. Fetch USD to INR rate
+      
+      // 3. Fetch USD to INR rate using the new API
       const fxRes = await axios.get(
-        "https://api.exchangerate.host/convert?from=USD&to=INR"
+        "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json"
       );
-      const usdToInr = fxRes.data.result;
+      const usdToInr = fxRes.data.usd.inr;
 
       // 4. Extract historical closing prices (for RSI, 7-day avg)
       const closePrices = candles.map(c => parseFloat(c[4])); // close price
 
       const current = Math.round(currentUSD * usdToInr);
-      const low = Math.round(Math.min(...candles.map(c => parseFloat(c[3])) * usdToInr)); // 14-day low
-      const high = Math.round(Math.max(...candles.map(c => parseFloat(c[2])) * usdToInr)); // 14-day high
+      
+      // Fixed: Properly calculate low and high prices in INR
+      const low = Math.round(Math.min(...candles.map(c => parseFloat(c[3]) * usdToInr))); // 14-day low
+      const high = Math.round(Math.max(...candles.map(c => parseFloat(c[2]) * usdToInr))); // 14-day high
       const open = Math.round(parseFloat(candles[candles.length - 1][1]) * usdToInr); // yesterday's open
 
       // 5. Calculate 7-day average (last 7 closes)
