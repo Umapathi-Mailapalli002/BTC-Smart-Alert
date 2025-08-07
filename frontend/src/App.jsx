@@ -27,7 +27,7 @@ const BitcoinAlertApp = () => {
     open: 0,
     sevenDayAvg: 0,
     rsi: 0,
-    change24h: 0
+    change24h: 0,
   });
 
   const [alerts, setAlerts] = useState({
@@ -40,77 +40,89 @@ const BitcoinAlertApp = () => {
       sms: false,
     },
   });
-  
-useEffect(() => {
-  const fetchBTCData = async () => {
-    try {
-      // 1. Fetch BTC/USDT Kline (candlestick) data for 14 days
-      const res1 = await axios.get(
-        "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=14"
-      );
 
-      const candles = res1.data; // Each candle = [time, open, high, low, close, ...]
+  useEffect(() => {
+    const fetchBTCData = async () => {
+      try {
+        // 1. Fetch BTC/USDT Kline (candlestick) data for 14 days
+        const res1 = await axios.get(
+          "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1d&limit=14"
+        );
 
-      
-      // 2. Fetch current BTC/USDT price
-      const priceRes = await axios.get(
-        "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
-      );
-      const currentUSD = parseFloat(priceRes.data.price);
-      
-      // 3. Fetch USD to INR rate using the new API
-      const fxRes = await axios.get(
-        "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json"
-      );
-      const usdToInr = fxRes.data.usd.inr;
+        const candles = res1.data; // Each candle = [time, open, high, low, close, ...]
 
-      // 4. Extract historical closing prices (for RSI, 7-day avg)
-      const closePrices = candles.map(c => parseFloat(c[4])); // close price
+        // 2. Fetch current BTC/USDT price
+        const priceRes = await axios.get(
+          "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+        );
+        const currentUSD = parseFloat(priceRes.data.price);
 
-      const current = Math.round(currentUSD * usdToInr);
-      
-      // Fixed: Properly calculate low and high prices in INR
-      const low = Math.round(Math.min(...candles.map(c => parseFloat(c[3]) * usdToInr))); // 14-day low
-      const high = Math.round(Math.max(...candles.map(c => parseFloat(c[2]) * usdToInr))); // 14-day high
-      const open = Math.round(parseFloat(candles[candles.length - 1][1]) * usdToInr); // yesterday's open
+        // 3. Fetch USD to INR rate using the new API
+        const fxRes = await axios.get(
+          "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json"
+        );
+        const usdToInr = fxRes.data.usd.inr;
 
-      // 5. Calculate 7-day average (last 7 closes)
-      const last7 = closePrices.slice(-30);
-      const sevenDayAvg =
-        (last7.reduce((sum, val) => sum + val, 0) / last7.length) * usdToInr;
+        // 4. Extract historical closing prices (for RSI, 7-day avg)
+        const closePrices = candles.map((c) => parseFloat(c[4])); // close price
 
-      // 6. Calculate RSI
-      const changes = closePrices.slice(1).map((p, i) => p - closePrices[i]);
-      const gains = changes.filter(c => c > 0);
-      const losses = changes.filter(c => c < 0).map(x => Math.abs(x));
-      const avgGain = gains.reduce((a, b) => a + b, 0) / 14 || 0.01;
-      const avgLoss = losses.reduce((a, b) => a + b, 0) / 14 || 0.01;
-      const rs = avgGain / avgLoss;
-      const rsi = 100 - 100 / (1 + rs);
+        const current = Math.round(currentUSD * usdToInr);
 
-      // 7. Change in 24h %
-      const yesterdayClose = parseFloat(candles[candles.length - 2][4]);
-      const change24h = ((currentUSD - yesterdayClose) / yesterdayClose) * 100;
+        // Fixed: Properly calculate low and high prices in INR
+        const low = Math.round(
+          Math.min(...candles.map((c) => parseFloat(c[3]) * usdToInr))
+        ); // 14-day low
+        const high = Math.round(
+          Math.max(...candles.map((c) => parseFloat(c[2]) * usdToInr))
+        ); // 14-day high
+        const open = Math.round(
+          parseFloat(candles[candles.length - 1][1]) * usdToInr
+        ); // yesterday's open
 
-      setBtcPrice(current);
-      setBtcData({
-        current,
-        low,
-        high,
-        open,
-        sevenDayAvg: Math.round(sevenDayAvg),
-        rsi: Math.round(rsi),
-        change24h: parseFloat(change24h.toFixed(2)),
-      });
-    } catch (err) {
-      console.error("Error fetching Binance BTC data:", err);
-    }
-  };
+        // 5. Calculate 7-day average (last 7 closes)
+        const last7ClosesUSD = closePrices.slice(-7);
+        const last7ClosesINR = last7ClosesUSD.map((price) =>
+          Math.round(price * usdToInr)
+        );
+        const sevenDayAvg =
+          last7ClosesINR.reduce((sum, val) => sum + val, 0) /
+          last7ClosesINR.length;
 
-  fetchBTCData();
-  const interval = setInterval(fetchBTCData, 5000); // update every 5 sec
-  return () => clearInterval(interval);
-}, []);
+        setPriceHistory(last7ClosesINR); // <-- This is the missing line
+
+        // 6. Calculate RSI
+        const changes = closePrices.slice(1).map((p, i) => p - closePrices[i]);
+        const gains = changes.filter((c) => c > 0);
+        const losses = changes.filter((c) => c < 0).map((x) => Math.abs(x));
+        const avgGain = gains.reduce((a, b) => a + b, 0) / 14 || 0.01;
+        const avgLoss = losses.reduce((a, b) => a + b, 0) / 14 || 0.01;
+        const rs = avgGain / avgLoss;
+        const rsi = 100 - 100 / (1 + rs);
+
+        // 7. Change in 24h %
+        const yesterdayClose = parseFloat(candles[candles.length - 2][4]);
+        const change24h =
+          ((currentUSD - yesterdayClose) / yesterdayClose) * 100;
+
+        setBtcPrice(current);
+        setBtcData({
+          current,
+          low,
+          high,
+          open,
+          sevenDayAvg: Math.round(sevenDayAvg),
+          rsi: Math.round(rsi),
+          change24h: parseFloat(change24h.toFixed(2)),
+        });
+      } catch (err) {
+        console.error("Error fetching Binance BTC data:", err);
+      }
+    };
+
+    fetchBTCData();
+    const interval = setInterval(fetchBTCData, 5000); // update every 5 sec
+    return () => clearInterval(interval);
+  }, []);
 
   // Handle page transitions
   const handlePageChange = (newPage) => {
@@ -134,30 +146,49 @@ useEffect(() => {
   };
 
   const isGoodTimeToBuy = () => {
-    return btcData.rsi < 30 || btcPrice < btcData.sevenDayAvg;
+    return (
+      btcData.rsi < 30 ||
+      btcPrice < btcData.sevenDayAvg ||
+      btcData.priceChange24h < -5
+    );
   };
 
   const MiniChart = () => {
-    const maxPrice = Math.max(...priceHistory);
-    const minPrice = Math.min(...priceHistory);
-
     return (
       <div className="w-full h-16 flex items-end space-x-1">
         {priceHistory.map((price, index) => {
-          const height = ((price - minPrice) / (maxPrice - minPrice)) * 60 + 8;
+          const maxPrice = Math.max(...priceHistory);
+          const minPrice = Math.min(...priceHistory);
+          const height =
+            ((price - minPrice) / (maxPrice - minPrice)) * 140 + 20;
+
           return (
             <div
               key={index}
-              className={`flex-1 rounded-t transition-all duration-500 hover:scale-105 ${
-                index === priceHistory.length - 1
-                  ? "bg-gradient-to-t from-orange-500 to-orange-400 shadow-lg shadow-orange-500/30 animate-pulse"
-                  : "bg-gradient-to-t from-gray-600 to-gray-500 hover:from-gray-500 hover:to-gray-400"
-              }`}
-              style={{
-                height: `${height}px`,
-                animationDelay: `${index * 100}ms`,
-              }}
-            />
+              className="flex-1 flex flex-col items-center group"
+            >
+              <div
+                className={`w-full rounded-t-lg transition-all duration-500 hover:scale-105 ${
+                  index === priceHistory.length - 1
+                    ? "bg-gradient-to-t from-gray-600 to-gray-400 shadow-lg shadow-orange-500/30 animate-pulse"
+                    : "bg-gradient-to-t from-gray-600 to-gray-400"
+                }`}
+                style={{
+                  height: `${height}px`,
+                  animationDelay: `${index * 100}ms`,
+                }}
+              />
+
+              {/* ✅ New: Show price value */}
+              <span className="text-sm font-semibold text-gray-200 mt-2">
+                ₹{(price / 100000).toFixed(2)}L
+              </span>
+
+              {/* Existing Day label */}
+              <span className="text-xs mt-1 group-hover:text-orange-100 transition-colors text-amber-100 duration-300">
+                Day {index + 1}
+              </span>
+            </div>
           );
         })}
       </div>
@@ -264,7 +295,7 @@ useEffect(() => {
                     : "text-yellow-400"
                 }`}
               >
-                {btcData.rsi}{" "}
+                {btcData.rsi.toFixed(2)}{" "}
                 {btcData.rsi < 30
                   ? "(Oversold)"
                   : btcData.rsi > 70
@@ -275,37 +306,38 @@ useEffect(() => {
           </div>
         </div>
 
-        <div
-          className={`rounded-2xl p-6 shadow-2xl border backdrop-blur-sm transition-all duration-500 hover:scale-105 ${
-            isPageTransitioning && currentPage === "dashboard"
-              ? "animate-slide-right"
-              : ""
-          } ${
-            isGoodTimeToBuy()
-              ? "bg-gradient-to-br from-green-900/80 to-green-800/80 border-green-500/50 hover:border-green-400/70"
-              : "bg-gradient-to-br from-red-900/80 to-red-800/80 border-red-500/50 hover:border-red-400/70"
-          }`}
-        >
-          <div className="flex items-center space-x-3 mb-4">
-            {isGoodTimeToBuy() ? (
-              <CheckCircle2 className="w-6 h-6 text-green-400 animate-pulse" />
-            ) : (
-              <AlertTriangle className="w-6 h-6 text-red-400 animate-pulse" />
-            )}
-            <h3 className="text-lg font-semibold text-gray-100">
-              Investment Signal
-            </h3>
-          </div>
-          <p
-            className={`text-lg font-medium transition-colors duration-300 ${
-              isGoodTimeToBuy() ? "text-green-200" : "text-red-200"
+          {/* ✅ Place your Investment Signal card here */}
+          <div
+            className={`rounded-2xl p-6 shadow-2xl border backdrop-blur-sm transition-all duration-500 hover:scale-105 ${
+              isPageTransitioning && currentPage === "dashboard"
+                ? "animate-slide-right"
+                : ""
+            } ${
+              isGoodTimeToBuy()
+                ? "bg-gradient-to-br from-green-900/80 to-green-800/80 border-green-500/50 hover:border-green-400/70"
+                : "bg-gradient-to-br from-red-900/80 to-red-800/80 border-red-500/50 hover:border-red-400/70"
             }`}
           >
-            {isGoodTimeToBuy()
-              ? "Today might be a dip — you could consider buying!"
-              : "BTC is currently above average. Not the best time to buy."}
-          </p>
-        </div>
+            <div className="flex items-center space-x-3 mb-4">
+              {isGoodTimeToBuy() ? (
+                <CheckCircle2 className="w-6 h-6 text-green-400 animate-pulse" />
+              ) : (
+                <AlertTriangle className="w-6 h-6 text-red-400 animate-pulse" />
+              )}
+              <h3 className="text-lg font-semibold text-gray-100">
+                Investment Signal
+              </h3>
+            </div>
+            <p
+              className={`text-lg font-medium transition-colors duration-300 ${
+                isGoodTimeToBuy() ? "text-green-200" : "text-red-200"
+              }`}
+            >
+              {isGoodTimeToBuy()
+                ? "Today might be a dip — you could consider buying!"
+                : "BTC is currently above average. Not the best time to buy."}
+            </p>
+          </div>
       </div>
 
       <div
@@ -578,7 +610,17 @@ useEffect(() => {
                         animationDelay: `${index * 100}ms`,
                       }}
                     />
-                    <span className="text-xs text-gray-400 mt-3 group-hover:text-orange-300 transition-colors duration-300">
+                    <span
+                      className={`text-xs mt-2 font-semibold ${
+                        index === priceHistory.length - 1
+                          ? "text-orange-400"
+                          : "text-gray-300"
+                      } group-hover:text-orange-400 transition-colors duration-300`}
+                    >
+                      ₹{price.toLocaleString("en-IN")}
+                    </span>
+
+                    <span className="text-[10px] text-gray-500 group-hover:text-orange-300 transition-colors duration-300">
                       Day {index + 1}
                     </span>
                   </div>
@@ -599,29 +641,7 @@ useEffect(() => {
             Recent Alert History
           </h3>
           <div className="space-y-4">
-            {[
-              {
-                date: "2025-08-02",
-                time: "14:30",
-                price: 4420000,
-                strategy: "RSI < 30",
-                status: "triggered",
-              },
-              {
-                date: "2025-08-01",
-                time: "09:15",
-                price: 4550000,
-                strategy: "Price Alert",
-                status: "triggered",
-              },
-              {
-                date: "2025-07-31",
-                time: "16:45",
-                price: 4580000,
-                strategy: "Moving Average",
-                status: "triggered",
-              },
-            ].map((alert, index) => (
+            {[].map((alert, index) => (
               <div
                 key={index}
                 className="flex items-center justify-between p-6 bg-gray-700/30 rounded-2xl border border-gray-600/30 hover:bg-gray-700/50 transition-all duration-300 hover:scale-[1.02] hover:border-orange-500/30 group"
