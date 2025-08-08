@@ -36,7 +36,7 @@ const BitcoinAlertApp = () => {
     useMA: true,
     notifications: {
       email: true,
-      telegram: true,
+      telegram: false,
       sms: false,
     },
   });
@@ -496,8 +496,8 @@ const BitcoinAlertApp = () => {
                 <span className="font-medium text-gray-100">Email</span>
               </label>
 
-              <label className="flex items-center space-x-3 p-4 border border-gray-600/50 rounded-2xl hover:bg-gray-700/30 cursor-pointer transition-all duration-300 hover:scale-105 hover:border-blue-500/50 group">
-                <input
+              <label className="flex items-center space-x-3 p-4 border border-gray-600/30 rounded-2xl cursor-not-allowed opacity-50 group">
+                <input disabled
                   type="checkbox"
                   checked={alerts.notifications.telegram}
                   onChange={(e) =>
@@ -508,11 +508,12 @@ const BitcoinAlertApp = () => {
                         telegram: e.target.checked,
                       },
                     })
+                    
                   }
                   className="w-5 h-5 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 transition-all duration-300"
                 />
-                <MessageCircle className="w-5 h-5 text-blue-400 group-hover:scale-110 transition-transform duration-300" />
-                <span className="font-medium text-gray-100">Telegram</span>
+                <MessageCircle className="w-5 h-5 text-blue-400 " />
+                <span className="font-medium text-gray-500">Telegram</span>
               </label>
 
               <label className="flex items-center space-x-3 p-4 border border-gray-600/30 rounded-2xl cursor-not-allowed opacity-50 group">
