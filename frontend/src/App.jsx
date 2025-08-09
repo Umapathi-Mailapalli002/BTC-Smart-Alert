@@ -20,7 +20,6 @@ const BitcoinAlertApp = () => {
   const [isPageTransitioning, setIsPageTransitioning] = useState(false);
   const [btcPrice, setBtcPrice] = useState(0);
   const [priceHistory, setPriceHistory] = useState([]);
-  const [email, setEmail] = useState("");
   const [btcData, setBtcData] = useState({
     current: 0,
     low: 0,
@@ -30,49 +29,6 @@ const BitcoinAlertApp = () => {
     rsi: 0,
     change24h: 0,
   });
-
-  const [alerts, setAlerts] = useState({
-    priceAlert: "",
-    useRSI: true,
-    useMA: true,
-    notifications: {
-      email: true,
-      telegram: false,
-      sms: false,
-    },
-  });
-
-  const handleSaveAlert = async () => {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      alert("Please enter a valid email address.");
-      return;
-    }
-
-    const alertData = {
-      email,
-      priceAlert: alerts.priceAlert,
-      rsiAlert: alerts.useRSI,
-      maAlert: alerts.useMA,
-    };
-    console.log("Saving alert data:", alertData);
-
-    // try {
-    //   const res = await fetch("http://localhost:5000/api/alerts", {
-    //     method: "POST",
-    //     headers: { "Content-Type": "application/json" },
-    //     body: JSON.stringify(alertData),
-    //   });
-
-    //   if (res.ok) {
-    //     alert("✅ Alert saved! You’ll get an email when conditions match.");
-    //   } else {
-    //     alert("❌ Failed to save alert.");
-    //   }
-    // } catch (error) {
-    //   console.error(error);
-    //   alert("⚠️ Error saving alert.");
-    // }
-  };
 
   useEffect(() => {
     const fetchBTCData = async () => {
@@ -399,229 +355,160 @@ const BitcoinAlertApp = () => {
     </div>
   );
 
-  const AlertsPage = () => {
-    const [alerts, setAlerts] = useState({
-      priceAlert: "",
-      useRSI: false,
-      useMA: false,
-      notifications: {
-        email: false,
-        telegram: false,
-        sms: false,
-      },
-    });
+const AlertsPage = () => {
+  const [alerts, setAlerts] = useState({
+    priceAlert: "",
+    useRSI: true,
+    useMA: true,
+    notifications: {
+      email: true,
+      telegram: false,
+      sms: false,
+    },
+  });
 
-    const [email, setEmail] = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
 
-    const handleSaveAlert = () => {
-      // Send data to backend
-      fetch("/api/save-alert", {
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const handleSaveAlert = async () => {
+    try {
+      const subject = "Crypto Alert Triggered";
+      const message = `
+        Your alert has been set with the following details:
+        Price Alert: ₹${alerts.priceAlert}
+        Strategies: ${alerts.useRSI ? "RSI " : ""}${alerts.useMA ? "MA" : ""}
+      `;
+
+      const res = await fetch("http://localhost:5000/api/send-alert", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...alerts,
-          email: alerts.notifications.email ? email : null,
+          to: email,
+          subject,
+          message,
         }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          alert(
-            `Alert settings saved!${email ? ` Email sent to ${email}` : ""}`
-          );
-        });
-    };
+      });
 
-    return (
-      <div
-        className={`max-w-2xl mx-auto space-y-6 ${
-          isPageTransitioning && currentPage === "alerts"
-            ? "animate-fade-in"
-            : ""
-        }`}
-      >
-        <div
-          className={`bg-gray-800/90 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border border-gray-700/50 hover:border-orange-500/50 transition-all duration-500 ${
-            isPageTransitioning && currentPage === "alerts"
-              ? "animate-slide-up"
-              : ""
-          }`}
-        >
-          <h2 className="text-3xl font-bold text-gray-100 mb-8 flex items-center space-x-3">
-            <Target className="w-8 h-8 text-orange-500 animate-pulse" />
-            <span className="bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
-              Set Smart Alerts
-            </span>
-          </h2>
+      const data = await res.json();
 
-          <div className="space-y-8">
-            {/* Price Alert */}
-            <div
-              className={`${
-                isPageTransitioning && currentPage === "alerts"
-                  ? "animate-slide-up-delay"
-                  : ""
-              }`}
-            >
-              <label className="block text-sm font-medium text-gray-300 mb-3">
-                Alert me when BTC price drops below:
-              </label>
-              <div className="relative group">
-                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-orange-400 font-bold text-lg">
-                  ₹
-                </span>
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to send alert");
+      }
+
+      alert(`Alert settings saved! Email sent to ${email}`);
+    } catch (err) {
+      alert(err.message || "Error saving alert settings.");
+    }
+  };
+
+  const handleSaveClick = () => {
+    if (alerts.notifications.email) {
+      if (!email || !validateEmail(email)) {
+        setError("Please enter a valid email address.");
+        return;
+      }
+    }
+    setError("");
+    handleSaveAlert();
+  };
+
+  return (
+    <div className="max-w-2xl mx-auto space-y-6">
+      <div className="bg-gray-800/90 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border border-gray-700/50">
+        <h2 className="text-3xl font-bold text-gray-100 mb-8 flex items-center space-x-3">
+          <Target className="w-8 h-8 text-orange-500 animate-pulse" />
+          <span className="bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
+            Set Smart Alerts
+          </span>
+        </h2>
+
+        <div className="space-y-8">
+          {/* Price Alert */}
+          <div>
+            <label className="block text-sm font-medium text-gray-300 mb-3">
+              Alert me when BTC price drops below:
+            </label>
+            <div className="relative group">
+              <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-orange-400 font-bold text-lg">
+                ₹
+              </span>
+              <input
+                type="text" // changed from number to text to prevent auto-blur issue
+                pattern="\d*"
+                inputMode="numeric"
+                value={alerts.priceAlert}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, ""); // allow only digits
+                  setAlerts((prev) => ({
+                    ...prev,
+                    priceAlert: value,
+                  }));
+                }}
+                placeholder="450000"
+                className="w-full pl-10 pr-4 py-4 bg-gray-700/50 border border-gray-600 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg text-gray-100 placeholder-gray-400 backdrop-blur-sm transition-all duration-300 hover:bg-gray-700/70"
+              />
+              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-orange-500/20 to-amber-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+            </div>
+          </div>
+
+          {/* Notification Methods */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-semibold text-gray-100">
+              Notification Methods
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="flex items-center space-x-3 p-4 border border-gray-600/50 rounded-2xl hover:bg-gray-700/30 cursor-pointer">
                 <input
-                  type="number"
-                  inputMode="numeric"
-                  value={alerts.priceAlert ?? ""}
+                  type="checkbox"
+                  checked={alerts.notifications.email}
                   onChange={(e) =>
                     setAlerts((prev) => ({
                       ...prev,
-                      priceAlert: e.target.value,
+                      notifications: {
+                        ...prev.notifications,
+                        email: e.target.checked,
+                      },
                     }))
                   }
-                  placeholder="450000"
-                  className="w-full pl-10 pr-4 py-4 bg-gray-700/50 border border-gray-600 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg text-gray-100 placeholder-gray-400 backdrop-blur-sm transition-all duration-300 hover:bg-gray-700/70"
+                  className="w-5 h-5 text-green-500 bg-gray-700 border-gray-600 rounded"
                 />
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-orange-500/20 to-amber-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-              </div>
+                <Mail className="w-5 h-5 text-green-400" />
+                <span className="font-medium text-gray-100">Email</span>
+              </label>
             </div>
 
-            {/* Smart Alert Strategies */}
-            <div
-              className={`space-y-6 ${
-                isPageTransitioning && currentPage === "alerts"
-                  ? "animate-slide-left"
-                  : ""
-              }`}
-            >
-              <h3 className="text-xl font-semibold text-gray-100">
-                Smart Alert Strategies
-              </h3>
-              <div className="space-y-4">
-                <label className="flex items-start space-x-4 p-6 border border-gray-600/50 rounded-2xl hover:bg-gray-700/30 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:border-orange-500/50 group">
-                  <input
-                    type="checkbox"
-                    checked={alerts.useRSI}
-                    onChange={(e) =>
-                      setAlerts((prev) => ({
-                        ...prev,
-                        useRSI: e.target.checked,
-                      }))
-                    }
-                    className="w-6 h-6 text-orange-500 bg-gray-700 border-gray-600 rounded-lg focus:ring-orange-500 focus:ring-2 transition-all duration-300"
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-100 group-hover:text-orange-300 transition-colors duration-300">
-                      RSI-Based Alerts
-                    </p>
-                    <p className="text-sm text-gray-400 mt-1">
-                      Alert when RSI drops below 30 (oversold condition)
-                    </p>
-                  </div>
-                </label>
-
-                <label className="flex items-start space-x-4 p-6 border border-gray-600/50 rounded-2xl hover:bg-gray-700/30 cursor-pointer transition-all duration-300 hover:scale-[1.02] hover:border-orange-500/50 group">
-                  <input
-                    type="checkbox"
-                    checked={alerts.useMA}
-                    onChange={(e) =>
-                      setAlerts((prev) => ({
-                        ...prev,
-                        useMA: e.target.checked,
-                      }))
-                    }
-                    className="w-6 h-6 text-orange-500 bg-gray-700 border-gray-600 rounded-lg focus:ring-orange-500 focus:ring-2 transition-all duration-300"
-                  />
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-100 group-hover:text-orange-300 transition-colors duration-300">
-                      Moving Average Strategy
-                    </p>
-                    <p className="text-sm text-gray-400 mt-1">
-                      Alert when price falls below 7-day moving average
-                    </p>
-                  </div>
-                </label>
+            {/* Email Input */}
+            {alerts.notifications.email && (
+              <div className="relative group">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  className="w-full pl-4 pr-4 py-4 bg-gray-700/50 border border-gray-600 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg text-gray-100 placeholder-gray-400"
+                />
+                {error && <p className="text-red-500 mt-2">{error}</p>}
               </div>
-            </div>
-
-            {/* Notification Methods + Email */}
-            <div
-              className={`space-y-6 ${
-                isPageTransitioning && currentPage === "alerts"
-                  ? "animate-slide-right"
-                  : ""
-              }`}
-            >
-              <h3 className="text-xl font-semibold text-gray-100">
-                Notification Methods
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <label className="flex items-center space-x-3 p-4 border border-gray-600/50 rounded-2xl hover:bg-gray-700/30 cursor-pointer transition-all duration-300 hover:scale-105 hover:border-green-500/50 group">
-                  <input
-                    type="checkbox"
-                    checked={alerts.notifications.email}
-                    onChange={(e) =>
-                      setAlerts((prev) => ({
-                        ...prev,
-                        notifications: {
-                          ...prev.notifications,
-                          email: e.target.checked,
-                        },
-                      }))
-                    }
-                    className="w-5 h-5 text-green-500 bg-gray-700 border-gray-600 rounded focus:ring-green-500 transition-all duration-300"
-                  />
-                  <Mail className="w-5 h-5 text-green-400 group-hover:scale-110 transition-transform duration-300" />
-                  <span className="font-medium text-gray-100">Email</span>
-                </label>
-
-                <label className="flex items-center space-x-3 p-4 border border-gray-600/30 rounded-2xl cursor-not-allowed opacity-50 group">
-                  <input disabled type="checkbox" />
-                  <MessageCircle className="w-5 h-5 text-blue-400 " />
-                  <span className="font-medium text-gray-500">Telegram</span>
-                </label>
-
-                <label className="flex items-center space-x-3 p-4 border border-gray-600/30 rounded-2xl cursor-not-allowed opacity-50 group">
-                  <input disabled type="checkbox" />
-                  <Smartphone className="w-5 h-5 text-gray-500" />
-                  <span className="font-medium text-gray-500">SMS (Pro)</span>
-                </label>
-              </div>
-
-              {/* Email Input (only visible if email notification is selected) */}
-              {alerts.notifications.email && (
-                <div className="relative group">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email"
-                    className="w-full pl-4 pr-4 py-4 bg-gray-700/50 border border-gray-600 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg text-gray-100 placeholder-gray-400 backdrop-blur-sm transition-all duration-300 hover:bg-gray-700/70"
-                  />
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-orange-500/20 to-amber-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-                </div>
-              )}
-            </div>
-
-            {/* Save Button */}
-            <button
-              onClick={handleSaveAlert}
-              className={`w-full bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 hover:from-orange-600 hover:via-orange-700 hover:to-amber-600 text-white py-5 rounded-2xl font-bold text-xl transition-all duration-500 transform hover:scale-[1.02] shadow-2xl hover:shadow-orange-500/25 ${
-                isPageTransitioning && currentPage === "alerts"
-                  ? "animate-slide-up-delay"
-                  : ""
-              }`}
-            >
-              <span className="flex items-center justify-center space-x-2">
-                <Bell className="w-6 h-6" />
-                <span>Save Alert Settings</span>
-              </span>
-            </button>
+            )}
           </div>
+
+          {/* Save Button */}
+          <button
+            onClick={handleSaveClick}
+            className="w-full bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white py-5 rounded-2xl font-bold text-xl"
+          >
+            <span className="flex items-center justify-center space-x-2">
+              <Bell className="w-6 h-6" />
+              <span>Save Alert Settings</span>
+            </span>
+          </button>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   const AnalysisPage = () => (
     <div
