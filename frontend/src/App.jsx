@@ -43,6 +43,7 @@ const BitcoinAlertApp = () => {
 
   useEffect(() => {
     const fetchBTCData = async () => {
+      if (currentPage !== "dashboard" && currentPage !== "analysis") return;
       try {
         // 1. Fetch BTC/USDT Kline (candlestick) data for 14 days
         const res1 = await axios.get(
@@ -122,7 +123,7 @@ const BitcoinAlertApp = () => {
     fetchBTCData();
     const interval = setInterval(fetchBTCData, 5000); // update every 5 sec
     return () => clearInterval(interval);
-  }, []);
+  }, [currentPage]);
 
   // Handle page transitions
   const handlePageChange = (newPage) => {
@@ -513,7 +514,7 @@ const BitcoinAlertApp = () => {
                   className="w-5 h-5 text-blue-500 bg-gray-700 border-gray-600 rounded focus:ring-blue-500 transition-all duration-300"
                 />
                 <MessageCircle className="w-5 h-5 text-blue-400 " />
-                <span className="font-medium text-gray-500">Telegram</span>
+                <span className="font-medium text-gray-00">Telegram</span>
               </label>
 
               <label className="flex items-center space-x-3 p-4 border border-gray-600/30 rounded-2xl cursor-not-allowed opacity-50 group">
