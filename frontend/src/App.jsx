@@ -141,44 +141,39 @@ const BitcoinAlertApp = () => {
     );
   };
 
+  // Modify the MiniChart component
   const MiniChart = () => {
     return (
-      <div className="w-full h-16 flex items-end space-x-1">
-        {priceHistory.map((price, index) => {
-          const maxPrice = Math.max(...priceHistory);
-          const minPrice = Math.min(...priceHistory);
-          const height =
-            ((price - minPrice) / (maxPrice - minPrice)) * 140 + 20;
+      <div className="w-full min-w-[300px] overflow-x-auto">
+        <div className="h-28 flex items-end space-x-1 p-2">
+          {priceHistory.map((price, index) => {
+            const maxPrice = Math.max(...priceHistory);
+            const minPrice = Math.min(...priceHistory);
+            const height = ((price - minPrice) / (maxPrice - minPrice)) * 80 + 10; // Reduced height calculation
 
-          return (
-            <div
-              key={index}
-              className="flex-1 flex flex-col items-center group"
-            >
-              <div
-                className={`w-full rounded-t-lg transition-all duration-500 hover:scale-105 ${
-                  index === priceHistory.length - 1
-                    ? "bg-gradient-to-t from-gray-600 to-gray-400 shadow-lg shadow-orange-500/30 animate-pulse"
-                    : "bg-gradient-to-t from-gray-600 to-gray-400"
-                }`}
-                style={{
-                  height: `${height}px`,
-                  animationDelay: `${index * 100}ms`,
-                }}
-              />
-
-              {/* ✅ New: Show price value */}
-              <span className="text-sm font-semibold text-gray-200 mt-2">
-                ₹{(price / 100000).toFixed(2)}L
-              </span>
-
-              {/* Existing Day label */}
-              <span className="text-xs mt-1 group-hover:text-orange-100 transition-colors text-amber-100 duration-300">
-                Day {index + 1}
-              </span>
-            </div>
-          );
-        })}
+            return (
+              <div key={index} className="flex-1 flex flex-col items-center group">
+                <div
+                  className={`w-full rounded-t-lg transition-all duration-500 hover:scale-105 ${
+                    index === priceHistory.length - 1
+                      ? "bg-gradient-to-t from-gray-600 to-gray-400 shadow-lg shadow-orange-500/30 animate-pulse"
+                      : "bg-gradient-to-t from-gray-600 to-gray-400"
+                  }`}
+                  style={{
+                    height: `${height}px`,
+                    animationDelay: `${index * 100}ms`,
+                  }}
+                />
+                <span className="text-xs font-semibold text-gray-200 mt-1">
+                  ₹{(price / 100000).toFixed(2)}L
+                </span>
+                <span className="text-[10px] text-amber-100 duration-300">
+                  Day {index + 1}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -621,46 +616,35 @@ const BitcoinAlertApp = () => {
           <h3 className="text-xl font-semibold text-gray-100 mb-6">
             7-Day Price Trend
           </h3>
-          <div className="bg-gradient-to-r from-gray-700/50 to-gray-800/50 p-6 rounded-2xl border border-gray-600/30 backdrop-blur-sm">
-            <div className="h-40 flex items-end space-x-3">
-              {priceHistory.map((price, index) => {
-                const maxPrice = Math.max(...priceHistory);
-                const minPrice = Math.min(...priceHistory);
-                const height =
-                  ((price - minPrice) / (maxPrice - minPrice)) * 140 + 20;
+          <div className="bg-gradient-to-r from-gray-700/50 to-gray-800/50 p-4 rounded-2xl border border-gray-600/30 backdrop-blur-sm overflow-x-auto">
+            <div className="min-w-[500px]">
+              <div className="h-32 flex items-end space-x-2">
+                {priceHistory.map((price, index) => {
+                  const maxPrice = Math.max(...priceHistory);
+                  const minPrice = Math.min(...priceHistory);
+                  const height = ((price - minPrice) / (maxPrice - minPrice)) * 100 + 10; // Reduced height calculation
 
-                return (
-                  <div
-                    key={index}
-                    className="flex-1 flex flex-col items-center group"
-                  >
-                    <div
-                      className={`w-full rounded-t-lg transition-all duration-500 hover:scale-105 ${
-                        index === priceHistory.length - 1
-                          ? "bg-gradient-to-t from-orange-600 to-orange-400 shadow-lg shadow-orange-500/30 animate-pulse"
-                          : "bg-gradient-to-t from-gray-600 to-gray-400 hover:from-orange-500 hover:to-orange-400"
-                      }`}
-                      style={{
-                        height: `${height}px`,
-                        animationDelay: `${index * 100}ms`,
-                      }}
-                    />
-                    <span
-                      className={`text-xs mt-2 font-semibold ${
-                        index === priceHistory.length - 1
-                          ? "text-orange-400"
-                          : "text-gray-300"
-                      } group-hover:text-orange-400 transition-colors duration-300`}
-                    >
-                      ₹{price.toLocaleString("en-IN")}
-                    </span>
-
-                    <span className="text-[10px] text-gray-500 group-hover:text-orange-300 transition-colors duration-300">
-                      Day {index + 1}
-                    </span>
-                  </div>
-                );
-              })}
+                  return (
+                    <div key={index} className="flex-1 flex flex-col items-center group">
+                      <div
+                        className={`w-full rounded-t-lg transition-all duration-500 hover:scale-105 ${
+                          index === priceHistory.length - 1
+                            ? "bg-gradient-to-t from-orange-600 to-orange-400 shadow-lg shadow-orange-500/30 animate-pulse"
+                            : "bg-gradient-to-t from-gray-600 to-gray-400 hover:from-orange-500 hover:to-orange-400"
+                        }`}
+                        style={{
+                          height: `${height}px`,
+                          animationDelay: `${index * 100}ms`,
+                        }}
+                      />
+                      <span className="text-xs mt-1 font-semibold text-gray-300 group-hover:text-orange-400 transition-colors duration-300">
+                        ₹{price.toLocaleString("en-IN")}
+                      </span>
+                      <span className="text-[10px] text-gray-500">Day {index + 1}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
