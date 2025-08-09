@@ -254,13 +254,9 @@ const BitcoinAlertApp = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         <div
-          className={`bg-gray-800/90 backdrop-blur-sm rounded-2xl p-6 shadow-2xl border border-gray-700/50 hover:border-orange-500/50 transition-all duration-500 hover:scale-105 ${
-            isPageTransitioning && currentPage === "dashboard"
-              ? "animate-slide-left"
-              : ""
-          }`}
+          className={`bg-gray-800/90 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-2xl border border-gray-700/50`}
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-100">
@@ -299,15 +295,7 @@ const BitcoinAlertApp = () => {
 
         {/* ✅ Place your Investment Signal card here */}
         <div
-          className={`rounded-2xl p-6 shadow-2xl border backdrop-blur-sm transition-all duration-500 hover:scale-105 ${
-            isPageTransitioning && currentPage === "dashboard"
-              ? "animate-slide-right"
-              : ""
-          } ${
-            isGoodTimeToBuy()
-              ? "bg-gradient-to-br from-green-900/80 to-green-800/80 border-green-500/50 hover:border-green-400/70"
-              : "bg-gradient-to-br from-red-900/80 to-red-800/80 border-red-500/50 hover:border-red-400/70"
-          }`}
+          className={`bg-gray-800/90 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-2xl border border-gray-700/50`}
         >
           <div className="flex items-center space-x-3 mb-4">
             {isGoodTimeToBuy() ? (
@@ -357,35 +345,36 @@ const BitcoinAlertApp = () => {
   );
 
   const AlertsPage = () => {
-    const [alerts, setAlerts] = useState({
-      priceAlert: "",
-      useRSI: true,
-      useMA: true,
-      notifications: {
-        email: true,
-        telegram: false,
-        sms: false,
-      },
+    const [alerts, setAlerts] = useState(() => {
+      const savedAlerts = localStorage.getItem('bitcoinAlerts');
+      return {
+        priceAlert: "",
+        useRSI: true,
+        useMA: true,
+        notifications: {
+          email: true,
+          telegram: false,
+          sms: false,
+        },
+        email: "",
+        alertHistory: savedAlerts ? JSON.parse(savedAlerts) : []
+      };
     });
 
-    const [email, setEmail] = useState("");
     const [error, setError] = useState("");
 
-    const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    // Save to localStorage whenever alertHistory changes
+    useEffect(() => {
+      localStorage.setItem('bitcoinAlerts', JSON.stringify(alerts.alertHistory));
+    }, [alerts.alertHistory]);
 
     const handleSaveAlert = async () => {
       try {
-        // Convert both values to numbers for comparison
         const alertPrice = Number(alerts.priceAlert);
         const currentPrice = Number(btcPriceUSD);
 
-        // Validate the alert price
         if (alertPrice >= currentPrice) {
-          setError(
-            "⚠️ Alert price must be lower than the current BTC price ($" +
-              btcPriceUSD +
-              ")"
-          );
+          setError("⚠️ Alert price must be lower than the current BTC price ($" + btcPriceUSD + ")");
           return;
         }
 
@@ -396,16 +385,16 @@ const BitcoinAlertApp = () => {
 
         const subject = "Crypto Alert Triggered";
         const message = `
-      Your alert has been set with the following details:
-      Price Alert: $${alerts.priceAlert}
-      Strategies: ${alerts.useRSI ? "RSI " : ""}${alerts.useMA ? "MA" : ""}
-    `;
+          Your alert has been set with the following details:
+          Price Alert: $${alerts.priceAlert}
+          Strategies: ${alerts.useRSI ? "RSI " : ""}${alerts.useMA ? "MA" : ""}
+        `;
 
         const res = await fetch("http://localhost:5000/api/send-alert", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            to: email,
+            to: alerts.email,
             subject,
             message,
           }),
@@ -417,28 +406,44 @@ const BitcoinAlertApp = () => {
           throw new Error(data.error || "Failed to send alert");
         }
 
-        // Clear error and show success message
+        // Save new alert to history
+        const newAlert = {
+          id: Date.now(),
+          price: alertPrice,
+          email: alerts.email,
+          date: new Date().toLocaleDateString(),
+          time: new Date().toLocaleTimeString(),
+          strategies: {
+            rsi: alerts.useRSI,
+            ma: alerts.useMA
+          }
+        };
+
+        setAlerts(prev => ({
+          ...prev,
+          alertHistory: [...prev.alertHistory, newAlert],
+          priceAlert: "", // Clear the price input
+          email: "" // Clear the email input
+        }));
+
         setError("");
-        alert(`Alert settings saved! Email sent to ${email}`);
+        alert(`Alert settings saved! Email sent to ${alerts.email}`);
       } catch (err) {
         setError(err.message || "Error saving alert settings.");
       }
     };
 
-    const handleSaveClick = () => {
-      if (alerts.notifications.email) {
-        if (!email || !validateEmail(email)) {
-          setError("Please enter a valid email address.");
-          return;
-        }
-      }
-      setError("");
-      handleSaveAlert();
+    // Modify the handleDeleteAlert function
+    const handleDeleteAlert = (alertId) => {
+      setAlerts(prev => ({
+        ...prev,
+        alertHistory: prev.alertHistory.filter(alert => alert.id !== alertId)
+      }));
     };
 
     return (
-      <div className="max-w-2xl mx-auto space-y-6">
-        <div className="bg-gray-800/90 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border border-gray-700/50">
+      <div className="max-w-2xl mx-auto px-4 sm:px-0 space-y-6">
+        <div className="bg-gray-800/90 backdrop-blur-sm rounded-3xl p-4 sm:p-8 shadow-2xl border border-gray-700/50">
           <h2 className="text-3xl font-bold text-gray-100 mb-8 flex items-center space-x-3">
             <Target className="w-8 h-8 text-orange-500 animate-pulse" />
             <span className="bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
@@ -480,7 +485,7 @@ const BitcoinAlertApp = () => {
               <h3 className="text-xl font-semibold text-gray-100">
                 Notification Methods
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <label className="flex items-center space-x-3 p-4 border border-gray-600/50 rounded-2xl hover:bg-gray-700/30 cursor-pointer">
                   <input
                     type="checkbox"
@@ -506,8 +511,8 @@ const BitcoinAlertApp = () => {
                 <div className="relative group">
                   <input
                     type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={alerts.email}
+                    onChange={(e) => setAlerts((prev) => ({ ...prev, email: e.target.value }))}
                     placeholder="Enter your email"
                     className="w-full pl-4 pr-4 py-4 bg-gray-700/50 border border-gray-600 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg text-gray-100 placeholder-gray-400"
                   />
@@ -518,7 +523,7 @@ const BitcoinAlertApp = () => {
 
             {/* Save Button */}
             <button
-              onClick={handleSaveClick}
+              onClick={handleSaveAlert}
               className="w-full bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white py-5 rounded-2xl font-bold text-xl"
             >
               <span className="flex items-center justify-center space-x-2">
@@ -526,6 +531,58 @@ const BitcoinAlertApp = () => {
                 <span>Save Alert Settings</span>
               </span>
             </button>
+
+            {/* Alert History */}
+            <div>
+              <h3 className="text-xl font-semibold text-gray-100 mb-4">
+                Alert History
+              </h3>
+              <div className="space-y-4">
+                {alerts.alertHistory.length === 0 ? (
+                  <p className="text-gray-400 text-sm">
+                    No alert history found.
+                  </p>
+                ) : (
+                  alerts.alertHistory.map((alert) => (
+                    <div
+                      key={alert.id}
+                      className="flex items-center justify-between p-4 bg-gray-700/30 rounded-2xl border border-gray-600/30 hover:bg-gray-700/50 transition-all duration-300"
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="w-4 h-4 bg-gradient-to-r from-green-400 to-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/30"></div>
+                        <div>
+                          <p className="font-semibold text-gray-100">
+                            Price Alert: ${alert.price}
+                          </p>
+                          <p className="text-sm text-gray-400">
+                            {alert.date} at {alert.time}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteAlert(alert.id)}
+                        className="text-red-400 hover:text-red-300 transition-colors duration-300"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className="h-5 w-5"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -615,37 +672,6 @@ const BitcoinAlertApp = () => {
               : ""
           }`}
         >
-          <h3 className="text-xl font-semibold text-gray-100 mb-6">
-            Recent Alert History
-          </h3>
-          <div className="space-y-4">
-            {[].map((alert, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-6 bg-gray-700/30 rounded-2xl border border-gray-600/30 hover:bg-gray-700/50 transition-all duration-300 hover:scale-[1.02] hover:border-orange-500/30 group"
-              >
-                <div className="flex items-center space-x-4">
-                  <div className="w-4 h-4 bg-gradient-to-r from-green-400 to-green-500 rounded-full animate-pulse shadow-lg shadow-green-500/30"></div>
-                  <div>
-                    <p className="font-semibold text-gray-100 group-hover:text-orange-300 transition-colors duration-300">
-                      {alert.strategy}
-                    </p>
-                    <p className="text-sm text-gray-400 mt-1">
-                      {alert.date} at {alert.time}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-gray-100 text-lg">
-                    {formatPrice(alert.price)}
-                  </p>
-                  <span className="text-xs text-green-300 bg-green-900/50 px-3 py-1 rounded-full border border-green-500/30 backdrop-blur-sm">
-                    Alert Sent
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
     </div>
@@ -729,39 +755,41 @@ const BitcoinAlertApp = () => {
         }
       `}</style>
 
+      {/* Modify the header section for better mobile responsiveness */}
       <header className="bg-gray-900/95 backdrop-blur-sm shadow-xl border-b border-gray-700/50">
-        <div className="max-w-6xl mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6">
+          <div className="flex flex-col sm:flex-row items-center justify-between space-y-4 sm:space-y-0">
             <div className="flex items-center space-x-4 animate-slide-left">
-              <div className="w-12 h-12 bg-gradient-to-br from-orange-500 via-orange-600 to-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/25 animate-pulse">
-                <TrendingUp className="w-7 h-7 text-white" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-orange-500 via-orange-600 to-amber-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/25 animate-pulse">
+                <TrendingUp className="w-6 h-6 sm:w-7 sm:h-7 text-white" />
               </div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
+              <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
                 BTC Smart Alert
               </h1>
             </div>
 
-            <div className="flex items-center space-x-6 animate-slide-right">
-              <div className="text-right bg-gray-800/50 p-4 rounded-2xl border border-gray-700/50 backdrop-blur-sm">
-                <p className="text-sm text-gray-400">Live BTC Price</p>
-                <p className="text-xl font-bold text-orange-400">
+            <div className="flex items-center space-x-4 sm:space-x-6 animate-slide-right">
+              <div className="text-right bg-gray-800/50 p-3 sm:p-4 rounded-2xl border border-gray-700/50 backdrop-blur-sm">
+                <p className="text-xs sm:text-sm text-gray-400">Live BTC Price</p>
+                <p className="text-lg sm:text-xl font-bold text-orange-400">
                   {btcPriceUSD}$
                 </p>
-                <p className="text-xl font-bold text-orange-400">
+                <p className="text-lg sm:text-xl font-bold text-orange-400">
                   {formatPrice(btcPrice)}
                 </p>
               </div>
-              <div className="w-12 h-12 bg-gray-800/50 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-gray-700/50 hover:border-orange-500/50 transition-all duration-300 hover:scale-110 cursor-pointer">
-                <Settings className="w-6 h-6 text-gray-300 hover:text-orange-400 transition-colors duration-300" />
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-800/50 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-gray-700/50 hover:border-orange-500/50 transition-all duration-300 hover:scale-110 cursor-pointer">
+                <Settings className="w-5 h-5 sm:w-6 sm:h-6 text-gray-300 hover:text-orange-400 transition-colors duration-300" />
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      <nav className="bg-gray-900/90 backdrop-blur-sm border-b border-gray-700/50">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="flex space-x-8">
+      {/* Modify the navigation for mobile */}
+      <nav className="bg-gray-900/90 backdrop-blur-sm border-b border-gray-700/50 overflow-x-auto">
+        <div className="max-w-6xl mx-auto px-2 sm:px-4">
+          <div className="flex space-x-2 sm:space-x-8">
             {[
               { id: "dashboard", label: "Dashboard", icon: TrendingUp },
               { id: "alerts", label: "Set Alerts", icon: Bell },
@@ -770,14 +798,14 @@ const BitcoinAlertApp = () => {
               <button
                 key={id}
                 onClick={() => handlePageChange(id)}
-                className={`flex items-center space-x-3 py-6 px-4 border-b-3 transition-all duration-300 hover:scale-105 ${
+                className={`flex items-center space-x-2 sm:space-x-3 py-4 sm:py-6 px-3 sm:px-4 border-b-3 transition-all duration-300 hover:scale-105 whitespace-nowrap ${
                   currentPage === id
                     ? "border-orange-500 text-orange-400 bg-orange-500/10"
                     : "border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-600"
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="font-semibold">{label}</span>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <span className="text-sm sm:text-base font-semibold">{label}</span>
               </button>
             ))}
           </div>
