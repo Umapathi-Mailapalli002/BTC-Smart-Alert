@@ -46,6 +46,10 @@ const BitcoinAlertApp = () => {
         );
         const currentUSD = parseFloat(priceRes.data.price);
         setBtcPriceUSD(currentUSD);
+
+        // Add this line to check alerts whenever price is updated
+        await checkAlertTriggers(currentUSD);
+
         // 3. Fetch USD to INR rate using the new API
         const fxRes = await axios.get(
           "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json"
@@ -108,9 +112,67 @@ const BitcoinAlertApp = () => {
     };
 
     fetchBTCData();
-    const interval = setInterval(fetchBTCData, 5000); // update every 5 sec
+    const interval = setInterval(fetchBTCData, 3000); // Changed to 3 seconds
     return () => clearInterval(interval);
   }, [currentPage]);
+
+  // Add this function near the top of BitcoinAlertApp component
+  const checkAlertTriggers = async (currentPrice) => {
+    try {
+      const savedAlerts = localStorage.getItem('bitcoinAlerts');
+      if (!savedAlerts) return;
+
+      const alerts = JSON.parse(savedAlerts);
+      
+      // Check each alert
+      for (const alert of alerts) {
+        if (currentPrice <= alert.price) {
+          // Alert triggered - send email
+          const subject = "🚨 Bitcoin Price Alert Triggered!";
+          const message = `
+            Your Bitcoin price alert has been triggered!
+            
+            Target Price: $${alert.price}
+            Current Price: $${currentPrice}
+            
+            This might be a good time to buy!
+            
+            Note: This alert will be removed from your active alerts.
+          `;
+
+          try {
+            const res = await fetch("http://localhost:5000/api/send-alert", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                to: alert.email,
+                subject,
+                message,
+              }),
+            });
+
+            if (res.ok) {
+              // Remove triggered alert from localStorage
+              const updatedAlerts = alerts.filter(a => a.id !== alert.id);
+              localStorage.setItem('bitcoinAlerts', JSON.stringify(updatedAlerts));
+
+              // Update UI if needed
+              if (currentPage === "alerts") {
+                setAlerts(prev => ({
+                  ...prev,
+                  alertHistory: updatedAlerts
+                }));
+              }
+            }
+          } catch (error) {
+            console.error("Failed to send alert email:", error);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error checking alerts:", error);
+    }
+  };
 
   // Handle page transitions
   const handlePageChange = (newPage) => {
@@ -220,10 +282,10 @@ const BitcoinAlertApp = () => {
           </div>
         </div>
 
-        <div className="text-5xl font-bold mb-6 bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
+        <div className="text-5xl font-bold bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
           {btcPriceUSD}$
         </div>
-        <div className="text-5xl font-bold mb-6 bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
+        <div className="text-xl font-bold mb-6 bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
           {formatPrice(btcPrice)}
         </div>
 
@@ -758,7 +820,7 @@ const BitcoinAlertApp = () => {
                 <p className="text-lg sm:text-xl font-bold text-orange-400">
                   {btcPriceUSD}$
                 </p>
-                <p className="text-lg sm:text-xl font-bold text-orange-400">
+                <p className="text-sm font-bold text-orange-400">
                   {formatPrice(btcPrice)}
                 </p>
               </div>
