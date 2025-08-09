@@ -7,8 +7,6 @@ import {
   BarChart3,
   Target,
   Mail,
-  MessageCircle,
-  Smartphone,
   CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
@@ -19,6 +17,7 @@ const BitcoinAlertApp = () => {
   const [previousPage, setPreviousPage] = useState("");
   const [isPageTransitioning, setIsPageTransitioning] = useState(false);
   const [btcPrice, setBtcPrice] = useState(0);
+  const [btcPriceUSD, setBtcPriceUSD] = useState(0);
   const [priceHistory, setPriceHistory] = useState([]);
   const [btcData, setBtcData] = useState({
     current: 0,
@@ -46,13 +45,12 @@ const BitcoinAlertApp = () => {
           "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
         );
         const currentUSD = parseFloat(priceRes.data.price);
-
+        setBtcPriceUSD(currentUSD);
         // 3. Fetch USD to INR rate using the new API
         const fxRes = await axios.get(
           "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json"
         );
         const usdToInr = fxRes.data.usd.inr;
-
         // 4. Extract historical closing prices (for RSI, 7-day avg)
         const closePrices = candles.map((c) => parseFloat(c[4])); // close price
 
@@ -78,7 +76,7 @@ const BitcoinAlertApp = () => {
           last7ClosesINR.reduce((sum, val) => sum + val, 0) /
           last7ClosesINR.length;
 
-        setPriceHistory(last7ClosesINR); // <-- This is the missing line
+        setPriceHistory(last7ClosesINR);
 
         // 6. Calculate RSI
         const changes = closePrices.slice(1).map((p, i) => p - closePrices[i]);
@@ -228,6 +226,9 @@ const BitcoinAlertApp = () => {
         </div>
 
         <div className="text-5xl font-bold mb-6 bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
+          {btcPriceUSD}$
+        </div>
+        <div className="text-5xl font-bold mb-6 bg-gradient-to-r from-white to-orange-100 bg-clip-text text-transparent">
           {formatPrice(btcPrice)}
         </div>
 
@@ -355,160 +356,181 @@ const BitcoinAlertApp = () => {
     </div>
   );
 
-const AlertsPage = () => {
-  const [alerts, setAlerts] = useState({
-    priceAlert: "",
-    useRSI: true,
-    useMA: true,
-    notifications: {
-      email: true,
-      telegram: false,
-      sms: false,
-    },
-  });
+  const AlertsPage = () => {
+    const [alerts, setAlerts] = useState({
+      priceAlert: "",
+      useRSI: true,
+      useMA: true,
+      notifications: {
+        email: true,
+        telegram: false,
+        sms: false,
+      },
+    });
 
-  const [email, setEmail] = useState("");
-  const [error, setError] = useState("");
+    const [email, setEmail] = useState("");
+    const [error, setError] = useState("");
 
-  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-  const handleSaveAlert = async () => {
-    try {
-      const subject = "Crypto Alert Triggered";
-      const message = `
-        Your alert has been set with the following details:
-        Price Alert: ₹${alerts.priceAlert}
-        Strategies: ${alerts.useRSI ? "RSI " : ""}${alerts.useMA ? "MA" : ""}
-      `;
+    const handleSaveAlert = async () => {
+      try {
+        // Convert both values to numbers for comparison
+        const alertPrice = Number(alerts.priceAlert);
+        const currentPrice = Number(btcPriceUSD);
 
-      const res = await fetch("http://localhost:5000/api/send-alert", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: email,
-          subject,
-          message,
-        }),
-      });
+        // Validate the alert price
+        if (alertPrice >= currentPrice) {
+          setError(
+            "⚠️ Alert price must be lower than the current BTC price ($" +
+              btcPriceUSD +
+              ")"
+          );
+          return;
+        }
 
-      const data = await res.json();
+        if (!alertPrice || isNaN(alertPrice)) {
+          setError("⚠️ Please enter a valid price alert value");
+          return;
+        }
 
-      if (!res.ok) {
-        throw new Error(data.error || "Failed to send alert");
+        const subject = "Crypto Alert Triggered";
+        const message = `
+      Your alert has been set with the following details:
+      Price Alert: $${alerts.priceAlert}
+      Strategies: ${alerts.useRSI ? "RSI " : ""}${alerts.useMA ? "MA" : ""}
+    `;
+
+        const res = await fetch("http://localhost:5000/api/send-alert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: email,
+            subject,
+            message,
+          }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Failed to send alert");
+        }
+
+        // Clear error and show success message
+        setError("");
+        alert(`Alert settings saved! Email sent to ${email}`);
+      } catch (err) {
+        setError(err.message || "Error saving alert settings.");
       }
+    };
 
-      alert(`Alert settings saved! Email sent to ${email}`);
-    } catch (err) {
-      alert(err.message || "Error saving alert settings.");
-    }
-  };
-
-  const handleSaveClick = () => {
-    if (alerts.notifications.email) {
-      if (!email || !validateEmail(email)) {
-        setError("Please enter a valid email address.");
-        return;
+    const handleSaveClick = () => {
+      if (alerts.notifications.email) {
+        if (!email || !validateEmail(email)) {
+          setError("Please enter a valid email address.");
+          return;
+        }
       }
-    }
-    setError("");
-    handleSaveAlert();
-  };
+      setError("");
+      handleSaveAlert();
+    };
 
-  return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="bg-gray-800/90 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border border-gray-700/50">
-        <h2 className="text-3xl font-bold text-gray-100 mb-8 flex items-center space-x-3">
-          <Target className="w-8 h-8 text-orange-500 animate-pulse" />
-          <span className="bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
-            Set Smart Alerts
-          </span>
-        </h2>
+    return (
+      <div className="max-w-2xl mx-auto space-y-6">
+        <div className="bg-gray-800/90 backdrop-blur-sm rounded-3xl p-8 shadow-2xl border border-gray-700/50">
+          <h2 className="text-3xl font-bold text-gray-100 mb-8 flex items-center space-x-3">
+            <Target className="w-8 h-8 text-orange-500 animate-pulse" />
+            <span className="bg-gradient-to-r from-orange-400 to-amber-400 bg-clip-text text-transparent">
+              Set Smart Alerts
+            </span>
+          </h2>
 
-        <div className="space-y-8">
-          {/* Price Alert */}
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">
-              Alert me when BTC price drops below:
-            </label>
-            <div className="relative group">
-              <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-orange-400 font-bold text-lg">
-                ₹
-              </span>
-              <input
-                type="text" // changed from number to text to prevent auto-blur issue
-                pattern="\d*"
-                inputMode="numeric"
-                value={alerts.priceAlert}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/\D/g, ""); // allow only digits
-                  setAlerts((prev) => ({
-                    ...prev,
-                    priceAlert: value,
-                  }));
-                }}
-                placeholder="450000"
-                className="w-full pl-10 pr-4 py-4 bg-gray-700/50 border border-gray-600 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg text-gray-100 placeholder-gray-400 backdrop-blur-sm transition-all duration-300 hover:bg-gray-700/70"
-              />
-              <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-orange-500/20 to-amber-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-            </div>
-          </div>
-
-          {/* Notification Methods */}
-          <div className="space-y-6">
-            <h3 className="text-xl font-semibold text-gray-100">
-              Notification Methods
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <label className="flex items-center space-x-3 p-4 border border-gray-600/50 rounded-2xl hover:bg-gray-700/30 cursor-pointer">
+          <div className="space-y-8">
+            {/* Price Alert */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                Alert me when BTC price drops below:
+              </label>
+              <div className="relative group">
+                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-orange-400 font-bold text-lg">
+                  ₹
+                </span>
                 <input
-                  type="checkbox"
-                  checked={alerts.notifications.email}
-                  onChange={(e) =>
+                  type="text" // changed from number to text to prevent auto-blur issue
+                  pattern="\d*"
+                  inputMode="numeric"
+                  value={alerts.priceAlert}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/\D/g, ""); // allow only digits
                     setAlerts((prev) => ({
                       ...prev,
-                      notifications: {
-                        ...prev.notifications,
-                        email: e.target.checked,
-                      },
-                    }))
-                  }
-                  className="w-5 h-5 text-green-500 bg-gray-700 border-gray-600 rounded"
+                      priceAlert: value,
+                    }));
+                  }}
+                  placeholder="45000$"
+                  className="w-full pl-10 pr-4 py-4 bg-gray-700/50 border border-gray-600 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg text-gray-100 placeholder-gray-400 backdrop-blur-sm transition-all duration-300 hover:bg-gray-700/70"
                 />
-                <Mail className="w-5 h-5 text-green-400" />
-                <span className="font-medium text-gray-100">Email</span>
-              </label>
+                <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-orange-500/20 to-amber-500/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
+              </div>
             </div>
 
-            {/* Email Input */}
-            {alerts.notifications.email && (
-              <div className="relative group">
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className="w-full pl-4 pr-4 py-4 bg-gray-700/50 border border-gray-600 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg text-gray-100 placeholder-gray-400"
-                />
-                {error && <p className="text-red-500 mt-2">{error}</p>}
+            {/* Notification Methods */}
+            <div className="space-y-6">
+              <h3 className="text-xl font-semibold text-gray-100">
+                Notification Methods
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <label className="flex items-center space-x-3 p-4 border border-gray-600/50 rounded-2xl hover:bg-gray-700/30 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={alerts.notifications.email}
+                    onChange={(e) =>
+                      setAlerts((prev) => ({
+                        ...prev,
+                        notifications: {
+                          ...prev.notifications,
+                          email: e.target.checked,
+                        },
+                      }))
+                    }
+                    className="w-5 h-5 text-green-500 bg-gray-700 border-gray-600 rounded"
+                  />
+                  <Mail className="w-5 h-5 text-green-400" />
+                  <span className="font-medium text-gray-100">Email</span>
+                </label>
               </div>
-            )}
-          </div>
 
-          {/* Save Button */}
-          <button
-            onClick={handleSaveClick}
-            className="w-full bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white py-5 rounded-2xl font-bold text-xl"
-          >
-            <span className="flex items-center justify-center space-x-2">
-              <Bell className="w-6 h-6" />
-              <span>Save Alert Settings</span>
-            </span>
-          </button>
+              {/* Email Input */}
+              {alerts.notifications.email && (
+                <div className="relative group">
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="w-full pl-4 pr-4 py-4 bg-gray-700/50 border border-gray-600 rounded-2xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-lg text-gray-100 placeholder-gray-400"
+                  />
+                  {error && <p className="text-red-500 mt-2">{error}</p>}
+                </div>
+              )}
+            </div>
+
+            {/* Save Button */}
+            <button
+              onClick={handleSaveClick}
+              className="w-full bg-gradient-to-r from-orange-500 via-orange-600 to-amber-500 text-white py-5 rounded-2xl font-bold text-xl"
+            >
+              <span className="flex items-center justify-center space-x-2">
+                <Bell className="w-6 h-6" />
+                <span>Save Alert Settings</span>
+              </span>
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   const AnalysisPage = () => (
     <div
@@ -722,6 +744,9 @@ const AlertsPage = () => {
             <div className="flex items-center space-x-6 animate-slide-right">
               <div className="text-right bg-gray-800/50 p-4 rounded-2xl border border-gray-700/50 backdrop-blur-sm">
                 <p className="text-sm text-gray-400">Live BTC Price</p>
+                <p className="text-xl font-bold text-orange-400">
+                  {btcPriceUSD}$
+                </p>
                 <p className="text-xl font-bold text-orange-400">
                   {formatPrice(btcPrice)}
                 </p>
